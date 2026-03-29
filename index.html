@@ -23,7 +23,7 @@
         .quest-form { background: var(--card); padding: 20px; border: 3px solid var(--primary); margin-bottom: 30px; box-shadow: 6px 6px 0px #5a008a; }
         input, select, button { font-family: 'Pixelify Sans', sans-serif; width: 100%; padding: 12px; margin: 10px 0; border: 2px solid #333; background: #1a1a1a; color: white; font-size: 16px !important; box-sizing: border-box; }
         button { background: var(--primary); border: none; border-bottom: 4px solid #5a008a; color: white; text-transform: uppercase; cursor: pointer; }
-        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        button:disabled { opacity: 0.5 !important; filter: grayscale(1); }
         .quest-card { background: var(--card); padding: 20px; margin-bottom: 20px; border: 3px solid #333; overflow: hidden; }
         .verified-border { border-color: var(--xp-color) !important; box-shadow: 0 0 10px var(--xp-color); }
         .xp-tag { color: var(--xp-color); font-size: 1.3rem; }
@@ -91,7 +91,7 @@
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-    import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, deleteDoc, doc, updateDoc, increment, setDoc, getDoc, writeBatch, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+    import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, deleteDoc, doc, updateDoc, increment, setDoc, getDoc, runTransaction, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyDw9qBL6_OxdYBhs9zghFjgueMkuLMvhiM",
@@ -110,7 +110,6 @@
     let firstLoad = true;
     let isAdmin = false;
     let playerDropdownHtml = '<option value="">-- Choose Hero --</option>';
-    const processingIds = new Set(); // Internal lock for payouts
 
     function showNews() {
         if(firstLoad) return;
@@ -139,17 +138,17 @@
         const allTimeBody = document.getElementById('all-time-body');
         scoreBody.innerHTML = ""; allTimeBody.innerHTML = "";
         playerDropdownHtml = '<option value="">-- Choose Hero --</option>';
-        let players = [];
+        let playersArr = [];
         snapshot.forEach(pDoc => {
             const p = pDoc.data();
-            players.push({ id: pDoc.id, ...p });
+            playersArr.push({ id: pDoc.id, ...p });
             playerDropdownHtml += `<option value="${pDoc.id}">${pDoc.id.toUpperCase()}</option>`;
         });
-        players.sort((a,b) => b.xp - a.xp).forEach(p => {
-            scoreBody.innerHTML += `<tr><td>${p.id.toUpperCase()}</td><td style="color:var(--xp-color)">${p.xp}</td><td><button class="small-del-btn" onclick="deleteHero('${p.id}')">X</button></td></tr>`;
+        playersArr.sort((a,b) => (b.xp || 0) - (a.xp || 0)).forEach(p => {
+            scoreBody.innerHTML += `<tr><td>${p.id.toUpperCase()}</td><td style="color:var(--xp-color)">${p.xp || 0}</td><td><button class="small-del-btn" onclick="deleteHero('${p.id}')">X</button></td></tr>`;
         });
-        players.sort((a,b) => b.allTimeXP - a.allTimeXP).forEach(p => {
-            allTimeBody.innerHTML += `<tr><td>${p.id.toUpperCase()}</td><td>${p.allTimeQuests}</td><td style="color:var(--accent)">${p.allTimeXP} XP</td></tr>`;
+        playersArr.sort((a,b) => (b.allTimeXP || 0) - (a.allTimeXP || 0)).forEach(p => {
+            allTimeBody.innerHTML += `<tr><td>${p.id.toUpperCase()}</td><td>${p.allTimeQuests || 0}</td><td style="color:var(--accent)">${p.allTimeXP || 0} XP</td></tr>`;
         });
     });
 
@@ -160,24 +159,44 @@
         firstLoad = false;
 
         aFeed.innerHTML = ""; cFeed.innerHTML = "";
-        const seenIds = new Set();
+        const processedThisCycle = new Set();
 
         snapshot.forEach(async (qDoc) => {
             const data = qDoc.data();
             const id = qDoc.id;
-            if(seenIds.has(id)) return;
-            seenIds.add(id);
+            if(processedThisCycle.has(id)) return;
+            processedThisCycle.add(id);
 
             const isVerified = (data.votes >= 2);
 
-            // PAYOUT LOGIC WITH DOUBLE-LOCK
-            if (isVerified && !data.scoreUpdated && data.claimedBy && !processingIds.has(id)) {
-                processingIds.add(id); // Lock locally
-                await updateDoc(doc(db, "quests", id), { scoreUpdated: true });
-                const pRef = doc(db, "players", data.claimedBy.toLowerCase());
-                const pSnap = await getDoc(pRef);
-                if(pSnap.exists()) await updateDoc(pRef, { xp: increment(data.xp), completedQuests: increment(1), allTimeXP: increment(data.xp), allTimeQuests: increment(1) });
-                else await setDoc(pRef, { xp: data.xp, completedQuests: 1, allTimeXP: data.xp, allTimeQuests: 1 });
+            // ATOMIC TRANSACTION FOR PAYOUT
+            if (isVerified && !data.scoreUpdated && data.claimedBy) {
+                try {
+                    await runTransaction(db, async (transaction) => {
+                        const qRef = doc(db, "quests", id);
+                        const qSnap = await transaction.get(qRef);
+                        
+                        // Check if someone else already finished it while we were thinking
+                        if (qSnap.data().scoreUpdated) return; 
+
+                        const pName = data.claimedBy.toLowerCase();
+                        const pRef = doc(db, "players", pName);
+                        const pSnap = await transaction.get(pRef);
+
+                        transaction.update(qRef, { scoreUpdated: true });
+
+                        if (!pSnap.exists()) {
+                            transaction.set(pRef, { xp: data.xp, completedQuests: 1, allTimeXP: data.xp, allTimeQuests: 1 });
+                        } else {
+                            transaction.update(pRef, {
+                                xp: increment(data.xp),
+                                completedQuests: increment(1),
+                                allTimeXP: increment(data.xp),
+                                allTimeQuests: increment(1)
+                            });
+                        }
+                    });
+                } catch (e) { console.error("Transaction failed: ", e); }
             }
 
             const card = document.createElement('div');
@@ -189,9 +208,15 @@
                 card.innerHTML = h + `<img src="${data.proofImage}" class="preview-img"><button class="small-del-btn" style="width:100%;margin-top:10px;" onclick="deleteQuestRecord('${id}')">DELETE</button>`;
                 cFeed.appendChild(card);
             } else {
-                if(data.status === "completed") { h += `<img src="${data.proofImage}" class="preview-img"><button id="vbtn-${id}" onclick="vouch('${id}')" class="btn-vouch">VOUCH (${data.votes}/2)</button>`; }
-                else if(data.status === "claimed") { h += `<p style="color:var(--accent)">IN PROGRESS...</p><input type="file" onchange="uploadProof(this, '${id}')" accept="image/*">`; }
-                else { h += `<div id="choice-${id}"><select id="sel-${id}">${playerDropdownHtml}</select><input type="text" id="new-${id}" placeholder="Or new hero..."><button onclick="acceptWithChoice('${id}')">ACCEPT</button></div>`; }
+                if(data.status === "completed") { 
+                    h += `<img src="${data.proofImage}" class="preview-img"><button id="vbtn-${id}" onclick="vouch('${id}')" class="btn-vouch">VOUCH (${data.votes}/2)</button>`; 
+                }
+                else if(data.status === "claimed") { 
+                    h += `<p style="color:var(--accent)">IN PROGRESS...</p><input type="file" onchange="uploadProof(this, '${id}')" accept="image/*">`; 
+                }
+                else { 
+                    h += `<div id="choice-${id}"><select id="sel-${id}">${playerDropdownHtml}</select><input type="text" id="new-${id}" placeholder="Or new hero..."><button onclick="acceptWithChoice('${id}')">ACCEPT</button></div>`; 
+                }
                 card.innerHTML = h;
                 aFeed.appendChild(card);
             }
@@ -208,19 +233,22 @@
 
     window.vouch = (id) => {
         const btn = document.getElementById(`vbtn-${id}`);
-        if(btn) btn.disabled = true; // Physical lockout
+        if(btn) { btn.disabled = true; btn.innerText = "VOUCHING..."; }
         updateDoc(doc(db, "quests", id), { votes: increment(1) });
     };
 
     window.deleteQuestRecord = (id) => deleteDoc(doc(db, "quests", id));
     window.deleteHero = (id) => deleteDoc(doc(db, "players", id));
-    window.updateGoal = () => setDoc(doc(db, "metadata", "roundSettings"), { goal: parseInt(document.getElementById('newGoalInput').value) });
+    window.updateGoal = () => setDoc(doc(db, "metadata", "roundSettings"), { goal: parseInt(document.getElementById('newGoalInput').value) || 0 });
+    
     window.resetRound = async () => {
         if(!confirm("Reset match?")) return;
-        const qSnap = await getDocs(questCol); const pSnap = await getDocs(playerCol);
-        const batch = writeBatch(db);
-        qSnap.forEach(d => batch.delete(d.ref)); pSnap.forEach(d => batch.update(d.ref, { xp: 0, completedQuests: 0 }));
-        await batch.commit();
+        const qSnap = await getDocs(questCol); 
+        const pSnap = await getDocs(playerCol);
+        const batch = runTransaction(db, async (transaction) => {
+            qSnap.forEach(d => transaction.delete(d.ref));
+            pSnap.forEach(d => transaction.update(d.ref, { xp: 0, completedQuests: 0 }));
+        });
     };
 
     window.uploadProof = (el, id) => {
