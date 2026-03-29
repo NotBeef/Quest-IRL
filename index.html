@@ -13,30 +13,23 @@
     
     <style>
         :root { --primary: #bc13fe; --bg: #050505; --card: #121212; --text: #ffffff; --xp-color: #39ff14; --accent: #ffcc00; --danger: #ff4444; }
-        
         body { font-family: 'Pixelify Sans', sans-serif; background-color: var(--bg); color: var(--text); margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; overscroll-behavior-y: contain; }
         .container { width: 100%; max-width: 500px; padding-bottom: env(safe-area-inset-bottom); margin-bottom: 60px; }
         h1 { color: var(--primary); text-align: center; font-size: 3rem; text-shadow: 4px 4px 0px #5a008a; margin-bottom: 5px;}
-        
         .goal-banner { background: #1a1a1a; border: 2px dashed var(--accent); padding: 10px; text-align: center; margin-bottom: 20px; color: var(--accent); font-size: 1.2rem; }
         .tabs { display: flex; gap: 5px; margin-bottom: 20px; position: sticky; top: 0; z-index: 100; background: var(--bg); padding: 10px 0; }
         .tab-btn { background: #222; border: 2px solid #444; padding: 10px; flex: 1; color: #888; cursor: pointer; border-bottom: 4px solid #111; font-size: 0.9rem; }
         .tab-btn.active { background: var(--primary); color: white; border-color: var(--primary); border-bottom: 4px solid #5a008a; }
-        
         .quest-form { background: var(--card); padding: 20px; border: 3px solid var(--primary); margin-bottom: 30px; box-shadow: 6px 6px 0px #5a008a; }
         input, select, button { font-family: 'Pixelify Sans', sans-serif; width: 100%; padding: 12px; margin: 10px 0; border: 2px solid #333; background: #1a1a1a; color: white; font-size: 16px !important; box-sizing: border-box; }
         button { background: var(--primary); border: none; border-bottom: 4px solid #5a008a; color: white; text-transform: uppercase; cursor: pointer; }
-        
         .quest-card { background: var(--card); padding: 20px; margin-bottom: 20px; border: 3px solid #333; overflow: hidden; }
         .verified-border { border-color: var(--xp-color) !important; box-shadow: 0 0 10px var(--xp-color); }
         .xp-tag { color: var(--xp-color); font-size: 1.3rem; }
         .player-tag { color: var(--accent); font-size: 1rem; margin-bottom: 10px; display: block; border-left: 3px solid var(--accent); padding-left: 8px; }
         .preview-img { width: 100%; height: 250px; object-fit: cover; margin-top: 15px; border: 2px solid var(--primary); border-radius: 4px; display: block; }
-        
-        /* NOTIFICATION BOX */
         #news-flash { position: fixed; top: -100px; left: 50%; transform: translateX(-50%); background: var(--accent); color: black; padding: 15px 30px; border-radius: 50px; font-weight: bold; z-index: 2000; transition: 0.5s; border: 3px solid black; }
         #news-flash.show { top: 20px; }
-
         table { width: 100%; border-collapse: collapse; background: var(--card); border: 2px solid var(--primary); margin-bottom: 20px; }
         th, td { padding: 12px; text-align: left; border-bottom: 1px solid #333; }
         .small-del-btn, .admin-only { display: none; background: var(--danger); font-size: 0.7rem; padding: 5px; width: auto; margin: 0; }
@@ -115,8 +108,8 @@
 
     let firstLoad = true;
     let isAdmin = false;
+    let playerDropdownHtml = '<option value="">-- Choose Hero --</option>';
 
-    // NOTIFICATION LOGIC
     function showNews() {
         if(firstLoad) return;
         const flash = document.getElementById('news-flash');
@@ -143,8 +136,14 @@
         const scoreBody = document.getElementById('score-body');
         const allTimeBody = document.getElementById('all-time-body');
         scoreBody.innerHTML = ""; allTimeBody.innerHTML = "";
+        playerDropdownHtml = '<option value="">-- Choose Hero --</option>';
+        
         let players = [];
-        snapshot.forEach(pDoc => players.push({ id: pDoc.id, ...pDoc.data() }));
+        snapshot.forEach(pDoc => {
+            const p = pDoc.data();
+            players.push({ id: pDoc.id, ...p });
+            playerDropdownHtml += `<option value="${pDoc.id}">${pDoc.id.toUpperCase()}</option>`;
+        });
         
         players.sort((a,b) => b.xp - a.xp).forEach(p => {
             scoreBody.innerHTML += `<tr><td>${p.id.toUpperCase()}</td><td style="color:var(--xp-color)">${p.xp}</td><td><button class="small-del-btn" onclick="deleteHero('${p.id}')">X</button></td></tr>`;
@@ -157,16 +156,18 @@
     onSnapshot(query(questCol, orderBy("createdAt", "desc")), (snapshot) => {
         const aFeed = document.getElementById('activeFeed');
         const cFeed = document.getElementById('completedFeed');
-        
-        // Notification check
         if (!firstLoad && snapshot.docChanges().length > 0) showNews();
         firstLoad = false;
 
         aFeed.innerHTML = ""; cFeed.innerHTML = "";
+        const seenIds = new Set(); // DUPLICATION FIX
 
         snapshot.forEach(async (qDoc) => {
             const data = qDoc.data();
             const id = qDoc.id;
+            if(seenIds.has(id)) return;
+            seenIds.add(id);
+
             const isVerified = (data.votes >= 2);
 
             if (isVerified && !data.scoreUpdated && data.claimedBy) {
@@ -188,25 +189,45 @@
             } else {
                 if(data.status === "completed") { h += `<img src="${data.proofImage}" class="preview-img"><button onclick="vouch('${id}')" class="btn-vouch">VOUCH (${data.votes}/2)</button>`; }
                 else if(data.status === "claimed") { h += `<p style="color:var(--accent)">IN PROGRESS...</p><input type="file" onchange="uploadProof(this, '${id}')" accept="image/*">`; }
-                else { h += `<button onclick="acceptQuest('${id}')">ACCEPT</button>`; }
+                else { 
+                    h += `<div id="choice-${id}">
+                            <select id="sel-${id}">${playerDropdownHtml}</select>
+                            <input type="text" id="new-${id}" placeholder="Or enter new name...">
+                            <button onclick="acceptWithChoice('${id}')">ACCEPT QUEST</button>
+                          </div>`; 
+                }
                 card.innerHTML = h;
                 aFeed.appendChild(card);
             }
         });
     });
 
-    // GLOBAL HELPERS
+    window.acceptWithChoice = async (id) => {
+        const selected = document.getElementById(`sel-${id}`).value;
+        const entered = document.getElementById(`new-${id}`).value.trim().toLowerCase();
+        const finalName = entered || selected;
+        
+        if(!finalName) return alert("Select or enter a Hero name!");
+        
+        const pRef = doc(db, "players", finalName);
+        const pSnap = await getDoc(pRef);
+        if(!pSnap.exists()) await setDoc(pRef, { xp: 0, completedQuests: 0, allTimeXP: 0, allTimeQuests: 0 });
+        
+        await updateDoc(doc(db, "quests", id), { claimedBy: finalName, status: "claimed" });
+    };
+
     window.vouch = (id) => updateDoc(doc(db, "quests", id), { votes: increment(1) });
     window.deleteQuestRecord = (id) => deleteDoc(doc(db, "quests", id));
     window.deleteHero = (id) => deleteDoc(doc(db, "players", id));
-    window.updateGoal = (val) => setDoc(doc(db, "metadata", "roundSettings"), { goal: parseInt(document.getElementById('newGoalInput').value) });
-    
-    window.acceptQuest = async (id) => {
-        const pName = prompt("Hero Name:")?.toLowerCase();
-        if(!pName) return;
-        const pRef = doc(db, "players", pName);
-        if(!(await getDoc(pRef)).exists()) await setDoc(pRef, { xp: 0, completedQuests: 0, allTimeXP: 0, allTimeQuests: 0 });
-        await updateDoc(doc(db, "quests", id), { claimedBy: pName, status: "claimed" });
+    window.updateGoal = () => setDoc(doc(db, "metadata", "roundSettings"), { goal: parseInt(document.getElementById('newGoalInput').value) });
+    window.resetRound = async () => {
+        if(!confirm("Reset current match?")) return;
+        const qSnap = await getDocs(questCol);
+        const pSnap = await getDocs(playerCol);
+        const batch = writeBatch(db);
+        qSnap.forEach(d => batch.delete(d.ref));
+        pSnap.forEach(d => batch.update(d.ref, { xp: 0, completedQuests: 0 }));
+        await batch.commit();
     };
 
     window.uploadProof = (el, id) => {
