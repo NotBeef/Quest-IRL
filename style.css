@@ -1,0 +1,9 @@
+/* Forces the browser to stay zoomed out when you type */
+input, select {
+    font-size: 16px !important;
+}
+
+/* If the text looks too small now, we just scale the container */
+input::placeholder {
+    font-size: 14px;
+}
