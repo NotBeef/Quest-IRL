@@ -17,32 +17,43 @@
         .container { width: 100%; max-width: 500px; padding-bottom: env(safe-area-inset-bottom); margin-bottom: 60px; }
         h1 { color: var(--primary); text-align: center; font-size: 3rem; text-shadow: 4px 4px 0px #5a008a; margin-bottom: 5px;}
         .goal-banner { background: #1a1a1a; border: 2px dashed var(--accent); padding: 10px; text-align: center; margin-bottom: 20px; color: var(--accent); font-size: 1.2rem; }
+        
+        /* TABS */
         .tabs { display: flex; gap: 5px; margin-bottom: 20px; position: sticky; top: 0; z-index: 100; background: var(--bg); padding: 10px 0; }
         .tab-btn { background: #222; border: 2px solid #444; padding: 10px; flex: 1; color: #888; cursor: pointer; border-bottom: 4px solid #111; font-size: 0.9rem; }
         .tab-btn.active { background: var(--primary); color: white; border-color: var(--primary); border-bottom: 4px solid #5a008a; }
         
+        /* FORMS */
         .quest-form { background: var(--card); padding: 20px; border: 3px solid var(--primary); margin-bottom: 30px; box-shadow: 6px 6px 0px #5a008a; }
         input, select, button { font-family: 'Pixelify Sans', sans-serif; width: 100%; padding: 12px; margin: 10px 0; border: 2px solid #333; background: #1a1a1a; color: white; font-size: 16px !important; box-sizing: border-box; }
         button { background: var(--primary); border: none; border-bottom: 4px solid #5a008a; color: white; text-transform: uppercase; cursor: pointer; }
         button:disabled { opacity: 0.5 !important; filter: grayscale(1); }
         
+        /* QUEST CARDS */
         .quest-card { background: var(--card); padding: 20px; margin-bottom: 20px; border: 3px solid #333; position: relative; }
         .verified-border { border-color: var(--xp-color) !important; box-shadow: 0 0 10px var(--xp-color); }
         .xp-tag { color: var(--xp-color); font-size: 1.3rem; }
         .player-tag { color: var(--accent); font-size: 1rem; margin-bottom: 10px; display: block; border-left: 3px solid var(--accent); padding-left: 8px; }
         .preview-img { width: 100%; height: 250px; object-fit: cover; margin-top: 15px; border: 2px solid var(--primary); border-radius: 4px; display: block; }
-        
         .btn-cancel { background: #444; border-bottom: 4px solid #222; margin-top: 5px; font-size: 0.8rem; }
-        .admin-del-overlay { position: absolute; top: 5px; right: 5px; background: var(--danger); color: white; border: none; padding: 5px 10px; font-size: 0.8rem; display: none; z-index: 10; width: auto; }
-        .admin-active .admin-del-overlay, .admin-active .admin-only { display: block; }
         
+        /* ADMIN CONTROLS */
+        .admin-del-overlay { position: absolute; top: 5px; right: 5px; background: var(--danger); color: white; border: none; padding: 5px 10px; font-size: 0.8rem; display: none; z-index: 10; width: auto; }
+        .small-del-btn { display: none; background: var(--danger); font-size: 0.7rem; padding: 5px; width: auto; margin: 0; line-height: 1; vertical-align: middle; }
+        .admin-only { display: none; border: 1px solid var(--danger); padding: 10px; margin-bottom: 20px; background: rgba(255, 68, 68, 0.1); }
+        
+        /* ACTIVATION CLASS */
+        .admin-active .admin-del-overlay, 
+        .admin-active .small-del-btn, 
+        .admin-active .admin-only { display: inline-block !important; }
+        
+        /* NEWS FLASH */
         #news-flash { position: fixed; top: -100px; left: 50%; transform: translateX(-50%); background: var(--accent); color: black; padding: 15px 30px; border-radius: 50px; font-weight: bold; z-index: 2000; transition: 0.5s; border: 3px solid black; }
         #news-flash.show { top: 20px; }
         
+        /* TABLES */
         table { width: 100%; border-collapse: collapse; background: var(--card); border: 2px solid var(--primary); margin-bottom: 20px; }
         th, td { padding: 12px; text-align: left; border-bottom: 1px solid #333; }
-        .small-del-btn { display: none; background: var(--danger); font-size: 0.7rem; padding: 5px; width: auto; margin: 0; }
-        .admin-only { display: none; border: 1px solid var(--danger); padding: 10px; margin-bottom: 20px; }
         .hidden { display: none; }
         footer { margin-top: 40px; color: #333; font-size: 0.7rem; cursor: pointer; opacity: 0.5; padding-bottom: 20px;}
     </style>
@@ -64,8 +75,8 @@
     <div id="active-section">
         <div class="quest-form">
             <h3 style="margin:0; color:var(--xp-color)">[ NEW QUEST ]</h3>
-            <input type="text" id="questTitle" placeholder="Quest Title (e.g. 'The Gym Run')">
-            <input type="text" id="questDesc" placeholder="Description/Objective...">
+            <input type="text" id="questTitle" placeholder="Quest Title (e.g. 'Night Walk')">
+            <input type="text" id="questDesc" placeholder="Objective (e.g. 'Walk 2 miles')">
             <select id="riskLevel">
                 <option value="1">Level 1: sweaty</option>
                 <option value="2">Level 2: risky</option>
@@ -82,13 +93,14 @@
 
     <div id="scores-section" class="hidden">
         <div class="admin-only">
+            <h4 style="margin:0 0 10px 0; color:var(--danger)">ADMIN TERMINAL</h4>
             <input type="number" id="newGoalInput" placeholder="Set XP Goal">
-            <button onclick="updateGoal()">Set New Goal</button>
-            <button style="background:var(--danger)" onclick="resetRound()">TERMINATE ROUND</button>
+            <button onclick="updateGoal()">Update XP Goal</button>
+            <button style="background:var(--danger)" onclick="resetRound()">RESET MATCH XP</button>
         </div>
-        <table><thead><tr><th>HERO</th><th>XP</th><th>-</th></tr></thead><tbody id="score-body"></tbody></table>
-        <h2 style="text-align:center;color:var(--accent)">ALL-TIME LEGENDS</h2>
-        <table><thead><tr><th>HERO</th><th>QUESTS</th><th>TOTAL XP</th></tr></thead><tbody id="all-time-body"></tbody></table>
+        <table><thead><tr><th>HERO</th><th>XP</th><th></th></tr></thead><tbody id="score-body"></tbody></table>
+        <h2 style="text-align:center;color:var(--accent); margin-top:30px;">ALL-TIME LEGENDS</h2>
+        <table><thead><tr><th>HERO</th><th>TOTAL XP</th><th></th></tr></thead><tbody id="all-time-body"></tbody></table>
     </div>
     <footer onclick="adminLogin()">Admin Access</footer>
 </div>
@@ -123,10 +135,10 @@
     }
 
     window.adminLogin = () => { 
-        if(prompt("Code:") === "3250") { 
+        if(prompt("Admin Code:") === "3250") { 
             isAdmin = true; 
             document.getElementById('mainBody').classList.add('admin-active'); 
-            alert("Admin Mode Engaged. You can now delete any quest.");
+            alert("Admin Mode Active.");
         } 
     };
     
@@ -153,11 +165,12 @@
             playersArr.push({ id: pDoc.id, ...pDoc.data() });
             playerDropdownHtml += `<option value="${pDoc.id}">${pDoc.id.toUpperCase()}</option>`;
         });
+        
         playersArr.sort((a,b) => (b.xp || 0) - (a.xp || 0)).forEach(p => {
-            scoreBody.innerHTML += `<tr><td>${p.id.toUpperCase()}</td><td style="color:var(--xp-color)">${p.xp || 0}</td><td><button class="small-del-btn" onclick="deleteHero('${p.id}')">X</button></td></tr>`;
+            scoreBody.innerHTML += `<tr><td>${p.id.toUpperCase()}</td><td style="color:var(--xp-color)">${p.xp || 0}</td><td style="text-align:right"><button class="small-del-btn" onclick="deleteHero('${p.id}')">X</button></td></tr>`;
         });
         playersArr.sort((a,b) => (b.allTimeXP || 0) - (a.allTimeXP || 0)).forEach(p => {
-            allTimeBody.innerHTML += `<tr><td>${p.id.toUpperCase()}</td><td>${p.allTimeQuests || 0}</td><td style="color:var(--accent)">${p.allTimeXP || 0} XP</td></tr>`;
+            allTimeBody.innerHTML += `<tr><td>${p.id.toUpperCase()}</td><td style="color:var(--accent)">${p.allTimeXP || 0} XP</td><td style="text-align:right"><button class="small-del-btn" onclick="deleteHero('${p.id}')">X</button></td></tr>`;
         });
     });
 
@@ -178,7 +191,6 @@
 
             const isVerified = (data.votes >= 2);
 
-            // PAYOUT LOGIC
             if (isVerified && !data.scoreUpdated && data.claimedBy) {
                 try {
                     await runTransaction(db, async (t) => {
@@ -196,19 +208,17 @@
 
             const card = document.createElement('div');
             card.className = `quest-card ${isVerified ? 'verified-border' : ''}`;
-            
-            // ADMIN DELETE BUTTON
             let adminBtn = `<button class="admin-del-overlay" onclick="deleteQuestRecord('${id}')">DELETE</button>`;
             
-            let h = adminBtn + `<div style="display:flex; justify-content:space-between; flex-direction:column;">
-                        <span style="color:var(--primary); font-size:1.2rem;">${data.title || 'QUEST'}</span>
-                        <div style="display:flex; justify-content:space-between">
-                            <span style="font-size:0.9rem; color:#ccc;">${data.desc}</span>
+            let h = adminBtn + `<div style="display:flex; flex-direction:column;">
+                        <span style="color:var(--primary); font-size:1.2rem; font-weight:bold;">${data.title || 'SIDE QUEST'}</span>
+                        <div style="display:flex; justify-content:space-between; align-items: flex-start; margin-top:5px;">
+                            <span style="font-size:0.9rem; color:#ccc; max-width:70%;">${data.desc}</span>
                             <span class="xp-tag">+${data.xp}</span>
                         </div>
                     </div>`;
             
-            if(data.claimedBy) h += `<span class="player-tag">${data.claimedBy.toUpperCase()}</span>`;
+            if(data.claimedBy) h += `<span class="player-tag" style="margin-top:10px;">${data.claimedBy.toUpperCase()}</span>`;
 
             if(isVerified) {
                 card.innerHTML = h + `<img src="${data.proofImage}" class="preview-img">`;
@@ -231,7 +241,8 @@
 
     window.forfeitQuest = (id) => { if(confirm("Abandon?")) updateDoc(doc(db, "quests", id), { claimedBy: "", status: "open" }); };
     window.acceptWithChoice = async (id) => {
-        const finalName = (document.getElementById(`new-${id}`).value.trim().toLowerCase() || document.getElementById(`sel-${id}`).value);
+        const nameVal = document.getElementById(`new-${id}`).value.trim().toLowerCase();
+        const finalName = nameVal || document.getElementById(`sel-${id}`).value;
         if(!finalName) return;
         const pRef = doc(db, "players", finalName);
         if(!(await getDoc(pRef)).exists()) await setDoc(pRef, { xp: 0, completedQuests: 0, allTimeXP: 0, allTimeQuests: 0 });
@@ -244,16 +255,16 @@
         updateDoc(doc(db, "quests", id), { votes: increment(1) });
     };
 
-    window.deleteQuestRecord = (id) => { if(confirm("Delete this quest?")) deleteDoc(doc(db, "quests", id)); };
-    window.deleteHero = (id) => { if(confirm("Delete hero?")) deleteDoc(doc(db, "players", id)); };
+    window.deleteQuestRecord = (id) => { if(confirm("Delete quest?")) deleteDoc(doc(db, "quests", id)); };
+    window.deleteHero = (id) => { if(confirm("Delete this hero and all their XP permanently?")) deleteDoc(doc(db, "players", id)); };
     window.updateGoal = () => setDoc(doc(db, "metadata", "roundSettings"), { goal: parseInt(document.getElementById('newGoalInput').value) || 0 });
     
     window.resetRound = async () => {
-        if(!confirm("Wipe current match XP?")) return;
+        if(!confirm("Wipe current match XP for everyone?")) return;
         const qSnap = await getDocs(questCol); const pSnap = await getDocs(playerCol);
-        const batch = runTransaction(db, async (transaction) => {
-            qSnap.forEach(d => transaction.delete(d.ref));
-            pSnap.forEach(d => transaction.update(d.ref, { xp: 0, completedQuests: 0 }));
+        await runTransaction(db, async (t) => {
+            qSnap.forEach(d => t.delete(d.ref));
+            pSnap.forEach(d => t.update(d.ref, { xp: 0, completedQuests: 0 }));
         });
     };
 
