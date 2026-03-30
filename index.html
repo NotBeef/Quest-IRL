@@ -20,29 +20,32 @@
         .tabs { display: flex; gap: 5px; margin-bottom: 20px; position: sticky; top: 0; z-index: 100; background: var(--bg); padding: 10px 0; }
         .tab-btn { background: #222; border: 2px solid #444; padding: 10px; flex: 1; color: #888; cursor: pointer; border-bottom: 4px solid #111; font-size: 0.9rem; }
         .tab-btn.active { background: var(--primary); color: white; border-color: var(--primary); border-bottom: 4px solid #5a008a; }
+        
         .quest-form { background: var(--card); padding: 20px; border: 3px solid var(--primary); margin-bottom: 30px; box-shadow: 6px 6px 0px #5a008a; }
         input, select, button { font-family: 'Pixelify Sans', sans-serif; width: 100%; padding: 12px; margin: 10px 0; border: 2px solid #333; background: #1a1a1a; color: white; font-size: 16px !important; box-sizing: border-box; }
         button { background: var(--primary); border: none; border-bottom: 4px solid #5a008a; color: white; text-transform: uppercase; cursor: pointer; }
         button:disabled { opacity: 0.5 !important; filter: grayscale(1); }
-        .btn-cancel { background: #444; border-bottom: 4px solid #222; margin-top: 5px; font-size: 0.8rem; }
-        .quest-card { background: var(--card); padding: 20px; margin-bottom: 20px; border: 3px solid #333; overflow: hidden; }
+        
+        .quest-card { background: var(--card); padding: 20px; margin-bottom: 20px; border: 3px solid #333; position: relative; }
         .verified-border { border-color: var(--xp-color) !important; box-shadow: 0 0 10px var(--xp-color); }
         .xp-tag { color: var(--xp-color); font-size: 1.3rem; }
         .player-tag { color: var(--accent); font-size: 1rem; margin-bottom: 10px; display: block; border-left: 3px solid var(--accent); padding-left: 8px; }
         .preview-img { width: 100%; height: 250px; object-fit: cover; margin-top: 15px; border: 2px solid var(--primary); border-radius: 4px; display: block; }
+        
+        .btn-cancel { background: #444; border-bottom: 4px solid #222; margin-top: 5px; font-size: 0.8rem; }
+        .admin-del-overlay { position: absolute; top: 5px; right: 5px; background: var(--danger); color: white; border: none; padding: 5px 10px; font-size: 0.8rem; display: none; z-index: 10; width: auto; }
+        .admin-active .admin-del-overlay, .admin-active .admin-only { display: block; }
+        
         #news-flash { position: fixed; top: -100px; left: 50%; transform: translateX(-50%); background: var(--accent); color: black; padding: 15px 30px; border-radius: 50px; font-weight: bold; z-index: 2000; transition: 0.5s; border: 3px solid black; }
         #news-flash.show { top: 20px; }
+        
         table { width: 100%; border-collapse: collapse; background: var(--card); border: 2px solid var(--primary); margin-bottom: 20px; }
         th, td { padding: 12px; text-align: left; border-bottom: 1px solid #333; }
-        .small-del-btn, .admin-only { display: none; background: var(--danger); font-size: 0.7rem; padding: 5px; width: auto; margin: 0; }
-        .admin-active .small-del-btn, .admin-active .admin-only { display: block; }
+        .small-del-btn { display: none; background: var(--danger); font-size: 0.7rem; padding: 5px; width: auto; margin: 0; }
+        .admin-only { display: none; border: 1px solid var(--danger); padding: 10px; margin-bottom: 20px; }
         .hidden { display: none; }
         footer { margin-top: 40px; color: #333; font-size: 0.7rem; cursor: pointer; opacity: 0.5; padding-bottom: 20px;}
     </style>
-
-    <script>
-        (function(a,b,c){if(c in b&&b[c]){var d,e=a.location,f=/^(a|html)$/i;a.addEventListener("click",function(a){d=a.target;while(!f.test(d.nodeName))d=d.parentNode;"href"in d&&(d.href.indexOf("http")||~d.href.indexOf(e.host))&&(a.preventDefault(),e.href=d.href)},!1)}})(document,window.navigator,"standalone")
-    </script>
 </head>
 <body id="mainBody">
 
@@ -50,7 +53,6 @@
 
 <div class="container">
     <h1>SIDE QUESTS</h1>
-    <div id="win-zone"></div>
     <div class="goal-banner" id="goal-display">GOAL: 5000 XP</div>
 
     <div class="tabs">
@@ -62,7 +64,8 @@
     <div id="active-section">
         <div class="quest-form">
             <h3 style="margin:0; color:var(--xp-color)">[ NEW QUEST ]</h3>
-            <input type="text" id="questName" placeholder="Mission description...">
+            <input type="text" id="questTitle" placeholder="Quest Title (e.g. 'The Gym Run')">
+            <input type="text" id="questDesc" placeholder="Description/Objective...">
             <select id="riskLevel">
                 <option value="1">Level 1: sweaty</option>
                 <option value="2">Level 2: risky</option>
@@ -78,7 +81,7 @@
     <div id="completed-section" class="hidden"><div id="completedFeed"></div></div>
 
     <div id="scores-section" class="hidden">
-        <div class="admin-only" style="margin-bottom: 20px; border: 1px solid var(--danger); padding: 10px;">
+        <div class="admin-only">
             <input type="number" id="newGoalInput" placeholder="Set XP Goal">
             <button onclick="updateGoal()">Set New Goal</button>
             <button style="background:var(--danger)" onclick="resetRound()">TERMINATE ROUND</button>
@@ -119,7 +122,13 @@
         setTimeout(() => flash.classList.remove('show'), 3000);
     }
 
-    window.adminLogin = () => { if(prompt("Code:") === "3250") { isAdmin = true; document.getElementById('mainBody').classList.add('admin-active'); } };
+    window.adminLogin = () => { 
+        if(prompt("Code:") === "3250") { 
+            isAdmin = true; 
+            document.getElementById('mainBody').classList.add('admin-active'); 
+            alert("Admin Mode Engaged. You can now delete any quest.");
+        } 
+    };
     
     window.switchTab = (type) => {
         ['active', 'completed', 'scores'].forEach(t => {
@@ -141,8 +150,7 @@
         playerDropdownHtml = '<option value="">-- Choose Hero --</option>';
         let playersArr = [];
         snapshot.forEach(pDoc => {
-            const p = pDoc.data();
-            playersArr.push({ id: pDoc.id, ...p });
+            playersArr.push({ id: pDoc.id, ...pDoc.data() });
             playerDropdownHtml += `<option value="${pDoc.id}">${pDoc.id.toUpperCase()}</option>`;
         });
         playersArr.sort((a,b) => (b.xp || 0) - (a.xp || 0)).forEach(p => {
@@ -170,41 +178,47 @@
 
             const isVerified = (data.votes >= 2);
 
+            // PAYOUT LOGIC
             if (isVerified && !data.scoreUpdated && data.claimedBy) {
                 try {
-                    await runTransaction(db, async (transaction) => {
+                    await runTransaction(db, async (t) => {
                         const qRef = doc(db, "quests", id);
-                        const qSnap = await transaction.get(qRef);
-                        if (qSnap.data().scoreUpdated) return; 
-                        const pName = data.claimedBy.toLowerCase();
-                        const pRef = doc(db, "players", pName);
-                        const pSnap = await transaction.get(pRef);
-                        transaction.update(qRef, { scoreUpdated: true });
-                        if (!pSnap.exists()) {
-                            transaction.set(pRef, { xp: data.xp, completedQuests: 1, allTimeXP: data.xp, allTimeQuests: 1 });
-                        } else {
-                            transaction.update(pRef, { xp: increment(data.xp), completedQuests: increment(1), allTimeXP: increment(data.xp), allTimeQuests: increment(1) });
-                        }
+                        const qSnap = await t.get(qRef);
+                        if (qSnap.data().scoreUpdated) return;
+                        const pRef = doc(db, "players", data.claimedBy.toLowerCase());
+                        const pSnap = await t.get(pRef);
+                        t.update(qRef, { scoreUpdated: true });
+                        if (!pSnap.exists()) t.set(pRef, { xp: data.xp, completedQuests: 1, allTimeXP: data.xp, allTimeQuests: 1 });
+                        else t.update(pRef, { xp: increment(data.xp), completedQuests: increment(1), allTimeXP: increment(data.xp), allTimeQuests: increment(1) });
                     });
-                } catch (e) { console.error(e); }
+                } catch (e) {}
             }
 
             const card = document.createElement('div');
             card.className = `quest-card ${isVerified ? 'verified-border' : ''}`;
-            let h = `<div style="display:flex; justify-content:space-between"><span>${data.name}</span><span class="xp-tag">+${data.xp}</span></div>`;
+            
+            // ADMIN DELETE BUTTON
+            let adminBtn = `<button class="admin-del-overlay" onclick="deleteQuestRecord('${id}')">DELETE</button>`;
+            
+            let h = adminBtn + `<div style="display:flex; justify-content:space-between; flex-direction:column;">
+                        <span style="color:var(--primary); font-size:1.2rem;">${data.title || 'QUEST'}</span>
+                        <div style="display:flex; justify-content:space-between">
+                            <span style="font-size:0.9rem; color:#ccc;">${data.desc}</span>
+                            <span class="xp-tag">+${data.xp}</span>
+                        </div>
+                    </div>`;
+            
             if(data.claimedBy) h += `<span class="player-tag">${data.claimedBy.toUpperCase()}</span>`;
 
             if(isVerified) {
-                card.innerHTML = h + `<img src="${data.proofImage}" class="preview-img"><button class="small-del-btn" style="width:100%;margin-top:10px;" onclick="deleteQuestRecord('${id}')">DELETE</button>`;
+                card.innerHTML = h + `<img src="${data.proofImage}" class="preview-img">`;
                 cFeed.appendChild(card);
             } else {
                 if(data.status === "completed") { 
                     h += `<img src="${data.proofImage}" class="preview-img"><button id="vbtn-${id}" onclick="vouch('${id}')" class="btn-vouch">VOUCH (${data.votes}/2)</button>`; 
                 }
                 else if(data.status === "claimed") { 
-                    h += `<p style="color:var(--accent)">IN PROGRESS...</p>
-                          <input type="file" onchange="uploadProof(this, '${id}')" accept="image/*">
-                          <button class="btn-cancel" onclick="forfeitQuest('${id}')">CANCEL MISSION</button>`; 
+                    h += `<p style="color:var(--accent)">IN PROGRESS...</p><input type="file" onchange="uploadProof(this, '${id}')" accept="image/*"><button class="btn-cancel" onclick="forfeitQuest('${id}')">CANCEL</button>`; 
                 }
                 else { 
                     h += `<div id="choice-${id}"><select id="sel-${id}">${playerDropdownHtml}</select><input type="text" id="new-${id}" placeholder="Or new hero..."><button onclick="acceptWithChoice('${id}')">ACCEPT</button></div>`; 
@@ -215,12 +229,7 @@
         });
     });
 
-    window.forfeitQuest = async (id) => {
-        if(confirm("Abandon mission? It will go back to the pool.")) {
-            await updateDoc(doc(db, "quests", id), { claimedBy: "", status: "open" });
-        }
-    };
-
+    window.forfeitQuest = (id) => { if(confirm("Abandon?")) updateDoc(doc(db, "quests", id), { claimedBy: "", status: "open" }); };
     window.acceptWithChoice = async (id) => {
         const finalName = (document.getElementById(`new-${id}`).value.trim().toLowerCase() || document.getElementById(`sel-${id}`).value);
         if(!finalName) return;
@@ -235,15 +244,14 @@
         updateDoc(doc(db, "quests", id), { votes: increment(1) });
     };
 
-    window.deleteQuestRecord = (id) => deleteDoc(doc(db, "quests", id));
-    window.deleteHero = (id) => deleteDoc(doc(db, "players", id));
+    window.deleteQuestRecord = (id) => { if(confirm("Delete this quest?")) deleteDoc(doc(db, "quests", id)); };
+    window.deleteHero = (id) => { if(confirm("Delete hero?")) deleteDoc(doc(db, "players", id)); };
     window.updateGoal = () => setDoc(doc(db, "metadata", "roundSettings"), { goal: parseInt(document.getElementById('newGoalInput').value) || 0 });
     
     window.resetRound = async () => {
-        if(!confirm("Reset match?")) return;
-        const qSnap = await getDocs(questCol); 
-        const pSnap = await getDocs(playerCol);
-        await runTransaction(db, async (transaction) => {
+        if(!confirm("Wipe current match XP?")) return;
+        const qSnap = await getDocs(questCol); const pSnap = await getDocs(playerCol);
+        const batch = runTransaction(db, async (transaction) => {
             qSnap.forEach(d => transaction.delete(d.ref));
             pSnap.forEach(d => transaction.update(d.ref, { xp: 0, completedQuests: 0 }));
         });
@@ -263,9 +271,12 @@
     };
 
     document.getElementById('submitQuest').onclick = () => {
-        const name = document.getElementById('questName').value; const risk = parseInt(document.getElementById('riskLevel').value);
-        if(name) addDoc(questCol, { name, risk, xp: 100 * risk, createdAt: Date.now(), status: "open", votes: 0, claimedBy: "", scoreUpdated: false });
-        document.getElementById('questName').value = "";
+        const title = document.getElementById('questTitle').value;
+        const desc = document.getElementById('questDesc').value;
+        const risk = parseInt(document.getElementById('riskLevel').value);
+        if(desc) addDoc(questCol, { title, desc, risk, xp: 100 * risk, createdAt: Date.now(), status: "open", votes: 0, claimedBy: "", scoreUpdated: false });
+        document.getElementById('questTitle').value = "";
+        document.getElementById('questDesc').value = "";
     };
 </script>
 </body>
