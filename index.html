@@ -19,7 +19,6 @@
         
         .goal-banner { background: #1a1a1a; border: 2px dashed var(--accent); padding: 10px; text-align: center; margin-bottom: 20px; color: var(--accent); font-size: 1.2rem; }
         
-        /* Victory Overlay */
         #win-zone { 
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
             background: rgba(0,0,0,0.9); z-index: 5000; flex-direction: column; 
@@ -50,13 +49,15 @@
         .verified-border { border-color: var(--xp-color) !important; box-shadow: 0 0 10px var(--xp-color); }
         .xp-tag { color: var(--xp-color); font-size: 1.3rem; }
         .player-tag { color: var(--accent); font-size: 1rem; margin-bottom: 10px; display: block; border-left: 3px solid var(--accent); padding-left: 8px; }
+        .creator-tag { font-size: 0.7rem; color: #666; display: block; margin-top: 5px; }
         .preview-img { width: 100%; height: 250px; object-fit: cover; margin-top: 15px; border: 2px solid var(--primary); border-radius: 4px; display: block; }
         #news-flash { position: fixed; top: -100px; left: 50%; transform: translateX(-50%); background: var(--accent); color: black; padding: 15px 30px; border-radius: 50px; font-weight: bold; z-index: 2000; transition: 0.5s; border: 3px solid black; }
         #news-flash.show { top: 20px; }
         table { width: 100%; border-collapse: collapse; background: var(--card); border: 2px solid var(--primary); margin-bottom: 20px; }
         th, td { padding: 12px; text-align: left; border-bottom: 1px solid #333; font-size: 0.9rem; }
-        .small-del-btn, .admin-only { display: none; background: var(--danger); font-size: 0.7rem; padding: 5px; width: auto; margin: 0; }
-        .admin-active .small-del-btn, .admin-active .admin-only { display: block; }
+        .admin-only { display: none; }
+        .admin-active .admin-only { display: block; }
+        .btn-penalty { background: var(--danger); border-bottom: 4px solid #8b0000; font-size: 0.7rem; width: auto; padding: 5px 10px; }
         .hidden { display: none; }
         footer { margin-top: 40px; color: #333; font-size: 0.7rem; cursor: pointer; opacity: 0.5; padding-bottom: 20px;}
     </style>
@@ -88,6 +89,7 @@
     <div id="active-section">
         <div class="quest-form">
             <h3 style="margin:0; color:var(--xp-color)">[ NEW QUEST ]</h3>
+            <input type="text" id="creatorName" placeholder="Your Hero Name (Creator)">
             <input type="text" id="questName" placeholder="Mission description...">
             <select id="riskLevel">
                 <option value="1">Level 1: sweaty</option>
@@ -111,10 +113,10 @@
         </div>
         
         <h2 style="text-align:center;color:var(--primary)">CURRENT ROUND</h2>
-        <table><thead><tr><th>HERO</th><th>XP</th><th>-</th></tr></thead><tbody id="score-body"></tbody></table>
+        <table><thead><tr><th>HERO</th><th>XP</th><th>ACTIONS</th></tr></thead><tbody id="score-body"></tbody></table>
         
         <h2 style="text-align:center;color:var(--accent)">ALL-TIME LEGENDS</h2>
-        <table><thead><tr><th>HERO</th><th>WINS</th><th>XP</th></tr></thead><tbody id="all-time-body"></tbody></table>
+        <table><thead><tr><th>HERO</th><th>WINS</th><th>SHAMES</th><th>XP</th></tr></thead><tbody id="all-time-body"></tbody></table>
     </div>
     <footer onclick="adminLogin()">Admin Access</footer>
 </div>
@@ -153,15 +155,10 @@
         document.getElementById('btn-' + type).classList.add('active');
     };
 
-    // Goal Listener
     onSnapshot(doc(db, "metadata", "roundSettings"), (d) => {
-        if(d.exists()) {
-            currentGoal = d.data().goal;
-            document.getElementById('goal-display').innerText = `GOAL: ${currentGoal} XP`;
-        }
+        if(d.exists()) { currentGoal = d.data().goal; document.getElementById('goal-display').innerText = `GOAL: ${currentGoal} XP`; }
     });
 
-    // Player/Victory Listener
     onSnapshot(playerCol, (snapshot) => {
         const scoreBody = document.getElementById('score-body');
         const allTimeBody = document.getElementById('all-time-body');
@@ -175,26 +172,33 @@
             playerDropdownHtml += `<option value="${pDoc.id}">${pDoc.id.toUpperCase()}</option>`;
         });
 
-        // Current Round Rank & Victory Check
         playersArr.sort((a,b) => (b.xp || 0) - (a.xp || 0)).forEach((p, index) => {
-            // Trigger Victory Screen if top player hits goal
             if (index === 0 && p.xp >= currentGoal && currentGoal > 0) {
                 document.getElementById('win-zone').classList.add('active');
                 document.getElementById('winner-name').innerText = p.id;
             }
-
             const goldClass = (p.allTimeWins > 0) ? 'class="gold-name"' : '';
-            scoreBody.innerHTML += `<tr><td ${goldClass}>${p.id.toUpperCase()}</td><td style="color:var(--xp-color)">${p.xp || 0}</td><td><button class="small-del-btn" onclick="deleteHero('${p.id}')">X</button></td></tr>`;
+            scoreBody.innerHTML += `<tr>
+                <td ${goldClass}>${p.id.toUpperCase()}</td>
+                <td style="color:var(--xp-color)">${p.xp || 0}</td>
+                <td>
+                    <button class="admin-only btn-penalty" onclick="applyPenalty('${p.id}')">-100 XP</button>
+                    <button class="admin-only small-del-btn" style="display:inline" onclick="deleteHero('${p.id}')">X</button>
+                </td>
+            </tr>`;
         });
 
-        // All-Time Legends
         playersArr.sort((a,b) => (b.allTimeWins || 0) - (a.allTimeWins || 0) || (b.allTimeXP || 0) - (a.allTimeXP || 0)).forEach(p => {
             const goldClass = (p.allTimeWins > 0) ? 'class="gold-name"' : '';
-            allTimeBody.innerHTML += `<tr><td ${goldClass}>${p.id.toUpperCase()}</td><td style="color:var(--accent)">${p.allTimeWins || 0}</td><td style="color:var(--xp-color)">${p.allTimeXP || 0}</td></tr>`;
+            allTimeBody.innerHTML += `<tr>
+                <td ${goldClass}>${p.id.toUpperCase()}</td>
+                <td>${p.allTimeWins || 0}</td>
+                <td style="color:var(--danger)">${p.shames || 0}</td>
+                <td style="color:var(--xp-color)">${p.allTimeXP || 0}</td>
+            </tr>`;
         });
     });
 
-    // Quest Feed Listener
     onSnapshot(query(questCol, orderBy("createdAt", "desc")), (snapshot) => {
         const aFeed = document.getElementById('activeFeed');
         const cFeed = document.getElementById('completedFeed');
@@ -211,7 +215,6 @@
             const id = qDoc.id;
             const isVerified = (data.votes >= 2);
 
-            // Handle XP Distribution via Transaction
             if (isVerified && !data.scoreUpdated && data.claimedBy) {
                 try {
                     await runTransaction(db, async (transaction) => {
@@ -222,7 +225,7 @@
                         const pSnap = await transaction.get(pRef);
                         transaction.update(qRef, { scoreUpdated: true });
                         if (!pSnap.exists()) {
-                            transaction.set(pRef, { xp: data.xp, completedQuests: 1, allTimeXP: data.xp, allTimeQuests: 1, allTimeWins: 0 });
+                            transaction.set(pRef, { xp: data.xp, completedQuests: 1, allTimeXP: data.xp, allTimeQuests: 1, allTimeWins: 0, shames: 0 });
                         } else {
                             transaction.update(pRef, { xp: increment(data.xp), completedQuests: increment(1), allTimeXP: increment(data.xp), allTimeQuests: increment(1) });
                         }
@@ -233,30 +236,45 @@
             const card = document.createElement('div');
             card.className = `quest-card ${isVerified ? 'verified-border' : ''}`;
             let h = `<div style="display:flex; justify-content:space-between"><span>${data.name}</span><span class="xp-tag">+${data.xp}</span></div>`;
+            h += `<span class="creator-tag">Created by: ${data.createdBy.toUpperCase()}</span>`;
             if(data.claimedBy) h += `<span class="player-tag">${data.claimedBy.toUpperCase()}</span>`;
 
             if(isVerified) {
-                card.innerHTML = h + `<img src="${data.proofImage}" class="preview-img"><button class="small-del-btn" style="width:100%;margin-top:10px;" onclick="deleteQuestRecord('${id}')">DELETE</button>`;
+                card.innerHTML = h + `<img src="${data.proofImage}" class="preview-img"><button class="admin-only" style="width:100%;margin-top:10px; background:var(--danger)" onclick="deleteQuestRecord('${id}')">DELETE</button>`;
                 cFeed.appendChild(card);
             } else {
                 if(data.status === "completed") { h += `<img src="${data.proofImage}" class="preview-img"><button id="vbtn-${id}" onclick="vouch('${id}')" class="btn-vouch">VOUCH (${data.votes}/2)</button>`; }
                 else if(data.status === "claimed") { h += `<p style="color:var(--accent)">IN PROGRESS...</p><input type="file" onchange="uploadProof(this, '${id}')" accept="image/*"><button class="btn-cancel" onclick="forfeitQuest('${id}')">CANCEL MISSION</button>`; }
-                else { h += `<div id="choice-${id}"><select id="sel-${id}">${playerDropdownHtml}</select><input type="text" id="new-${id}" placeholder="Or new hero..."><button onclick="acceptWithChoice('${id}')">ACCEPT</button></div>`; }
+                else { 
+                    h += `<div id="choice-${id}">
+                            <select id="sel-${id}">${playerDropdownHtml}</select>
+                            <input type="text" id="new-${id}" placeholder="Or new hero...">
+                            <button onclick="acceptWithChoice('${id}', '${data.createdBy}')">ACCEPT</button>
+                          </div>`; 
+                }
                 card.innerHTML = h;
                 aFeed.appendChild(card);
             }
         });
     });
 
-    // Helper functions
-    window.forfeitQuest = async (id) => { if(confirm("Abandon mission?")) await updateDoc(doc(db, "quests", id), { claimedBy: "", status: "open" }); };
-    window.acceptWithChoice = async (id) => {
+    window.applyPenalty = async (pId) => {
+        if(!confirm(`Apply Shame Penalty to ${pId.toUpperCase()}? (-100 XP)`)) return;
+        const pRef = doc(db, "players", pId.toLowerCase());
+        await updateDoc(pRef, { xp: increment(-100), shames: increment(1) });
+    };
+
+    window.acceptWithChoice = async (id, creator) => {
         const finalName = (document.getElementById(`new-${id}`).value.trim().toLowerCase() || document.getElementById(`sel-${id}`).value);
         if(!finalName) return;
+        if(finalName === creator.toLowerCase()) { alert("You cannot do your own quest! Nice try."); return; }
+        
         const pRef = doc(db, "players", finalName);
-        if(!(await getDoc(pRef)).exists()) await setDoc(pRef, { xp: 0, completedQuests: 0, allTimeXP: 0, allTimeQuests: 0, allTimeWins: 0 });
+        if(!(await getDoc(pRef)).exists()) await setDoc(pRef, { xp: 0, completedQuests: 0, allTimeXP: 0, allTimeQuests: 0, allTimeWins: 0, shames: 0 });
         await updateDoc(doc(db, "quests", id), { claimedBy: finalName, status: "claimed" });
     };
+
+    window.forfeitQuest = async (id) => { if(confirm("Abandon mission?")) await updateDoc(doc(db, "quests", id), { claimedBy: "", status: "open" }); };
     window.vouch = (id) => { updateDoc(doc(db, "quests", id), { votes: increment(1) }); };
     window.deleteQuestRecord = (id) => deleteDoc(doc(db, "quests", id));
     window.deleteHero = (id) => deleteDoc(doc(db, "players", id));
@@ -292,9 +310,19 @@
     };
 
     document.getElementById('submitQuest').onclick = () => {
-        const name = document.getElementById('questName').value; const risk = parseInt(document.getElementById('riskLevel').value);
-        if(name) addDoc(questCol, { name, risk, xp: 100 * risk, createdAt: Date.now(), status: "open", votes: 0, claimedBy: "", scoreUpdated: false });
-        document.getElementById('questName').value = "";
+        const creator = document.getElementById('creatorName').value.trim();
+        const name = document.getElementById('questName').value;
+        const risk = parseInt(document.getElementById('riskLevel').value);
+        if(name && creator) {
+            addDoc(questCol, { 
+                name, risk, xp: 100 * risk, createdAt: Date.now(), 
+                status: "open", votes: 0, claimedBy: "", 
+                createdBy: creator, scoreUpdated: false 
+            });
+            document.getElementById('questName').value = "";
+        } else {
+            alert("Enter your name and a mission description!");
+        }
     };
 </script>
 </body>
