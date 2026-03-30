@@ -16,9 +16,18 @@
         body { font-family: 'Pixelify Sans', sans-serif; background-color: var(--bg); color: var(--text); margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; overscroll-behavior-y: contain; }
         .container { width: 100%; max-width: 500px; padding-bottom: env(safe-area-inset-bottom); margin-bottom: 60px; }
         h1 { color: var(--primary); text-align: center; font-size: 3rem; text-shadow: 4px 4px 0px #5a008a; margin-bottom: 5px;}
+        
         .goal-banner { background: #1a1a1a; border: 2px dashed var(--accent); padding: 10px; text-align: center; margin-bottom: 20px; color: var(--accent); font-size: 1.2rem; }
         
-        /* Golden Hero Effect */
+        /* Victory Overlay */
+        #win-zone { 
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+            background: rgba(0,0,0,0.9); z-index: 5000; flex-direction: column; 
+            justify-content: center; align-items: center; text-align: center;
+        }
+        #win-zone.active { display: flex; animation: fadeIn 0.5s; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
         .gold-name { 
             color: var(--accent) !important; 
             text-shadow: 0 0 10px rgba(255, 204, 0, 0.8);
@@ -51,18 +60,23 @@
         .hidden { display: none; }
         footer { margin-top: 40px; color: #333; font-size: 0.7rem; cursor: pointer; opacity: 0.5; padding-bottom: 20px;}
     </style>
-
-    <script>
-        (function(a,b,c){if(c in b&&b[c]){var d,e=a.location,f=/^(a|html)$/i;a.addEventListener("click",function(a){d=a.target;while(!f.test(d.nodeName))d=d.parentNode;"href"in d&&(d.href.indexOf("http")||~d.href.indexOf(e.host))&&(a.preventDefault(),e.href=d.href)},!1)}})(document,window.navigator,"standalone")
-    </script>
 </head>
 <body id="mainBody">
 
 <div id="news-flash">NEWS</div>
 
+<div id="win-zone">
+    <h1 style="font-size: 4rem; color: var(--accent);">VICTORY</h1>
+    <h2 id="winner-name" style="color: white; text-transform: uppercase;">HERO NAME</h2>
+    <p style="color: var(--xp-color);">REACHED THE XP GOAL!</p>
+    <div class="admin-only">
+        <button onclick="resetRound()" style="background: var(--xp-color); color: black;">CLAIM WIN & RESET BOARD</button>
+    </div>
+    <button onclick="document.getElementById('win-zone').classList.remove('active')" class="btn-cancel">CLOSE</button>
+</div>
+
 <div class="container">
     <h1>SIDE QUESTS</h1>
-    <div id="win-zone"></div>
     <div class="goal-banner" id="goal-display">GOAL: 5000 XP</div>
 
     <div class="tabs">
@@ -125,14 +139,8 @@
 
     let firstLoad = true;
     let isAdmin = false;
+    let currentGoal = 5000;
     let playerDropdownHtml = '<option value="">-- Choose Hero --</option>';
-
-    function showNews() {
-        if(firstLoad) return;
-        const flash = document.getElementById('news-flash');
-        flash.classList.add('show');
-        setTimeout(() => flash.classList.remove('show'), 3000);
-    }
 
     window.adminLogin = () => { if(prompt("Code:") === "3250") { isAdmin = true; document.getElementById('mainBody').classList.add('admin-active'); } };
     
@@ -145,10 +153,15 @@
         document.getElementById('btn-' + type).classList.add('active');
     };
 
+    // Goal Listener
     onSnapshot(doc(db, "metadata", "roundSettings"), (d) => {
-        if(d.exists()) document.getElementById('goal-display').innerText = `GOAL: ${d.data().goal} XP`;
+        if(d.exists()) {
+            currentGoal = d.data().goal;
+            document.getElementById('goal-display').innerText = `GOAL: ${currentGoal} XP`;
+        }
     });
 
+    // Player/Victory Listener
     onSnapshot(playerCol, (snapshot) => {
         const scoreBody = document.getElementById('score-body');
         const allTimeBody = document.getElementById('all-time-body');
@@ -162,44 +175,50 @@
             playerDropdownHtml += `<option value="${pDoc.id}">${pDoc.id.toUpperCase()}</option>`;
         });
 
-        // Sort for Current Scoreboard
-        playersArr.sort((a,b) => (b.xp || 0) - (a.xp || 0)).forEach(p => {
+        // Current Round Rank & Victory Check
+        playersArr.sort((a,b) => (b.xp || 0) - (a.xp || 0)).forEach((p, index) => {
+            // Trigger Victory Screen if top player hits goal
+            if (index === 0 && p.xp >= currentGoal && currentGoal > 0) {
+                document.getElementById('win-zone').classList.add('active');
+                document.getElementById('winner-name').innerText = p.id;
+            }
+
             const goldClass = (p.allTimeWins > 0) ? 'class="gold-name"' : '';
             scoreBody.innerHTML += `<tr><td ${goldClass}>${p.id.toUpperCase()}</td><td style="color:var(--xp-color)">${p.xp || 0}</td><td><button class="small-del-btn" onclick="deleteHero('${p.id}')">X</button></td></tr>`;
         });
 
-        // Sort for All-Time Legends
+        // All-Time Legends
         playersArr.sort((a,b) => (b.allTimeWins || 0) - (a.allTimeWins || 0) || (b.allTimeXP || 0) - (a.allTimeXP || 0)).forEach(p => {
             const goldClass = (p.allTimeWins > 0) ? 'class="gold-name"' : '';
             allTimeBody.innerHTML += `<tr><td ${goldClass}>${p.id.toUpperCase()}</td><td style="color:var(--accent)">${p.allTimeWins || 0}</td><td style="color:var(--xp-color)">${p.allTimeXP || 0}</td></tr>`;
         });
     });
 
+    // Quest Feed Listener
     onSnapshot(query(questCol, orderBy("createdAt", "desc")), (snapshot) => {
         const aFeed = document.getElementById('activeFeed');
         const cFeed = document.getElementById('completedFeed');
-        if (!firstLoad && snapshot.docChanges().length > 0) showNews();
+        if (!firstLoad && snapshot.docChanges().length > 0) {
+            const flash = document.getElementById('news-flash');
+            flash.classList.add('show');
+            setTimeout(() => flash.classList.remove('show'), 3000);
+        }
         firstLoad = false;
-
         aFeed.innerHTML = ""; cFeed.innerHTML = "";
-        const processedThisCycle = new Set();
 
         snapshot.forEach(async (qDoc) => {
             const data = qDoc.data();
             const id = qDoc.id;
-            if(processedThisCycle.has(id)) return;
-            processedThisCycle.add(id);
-
             const isVerified = (data.votes >= 2);
 
+            // Handle XP Distribution via Transaction
             if (isVerified && !data.scoreUpdated && data.claimedBy) {
                 try {
                     await runTransaction(db, async (transaction) => {
                         const qRef = doc(db, "quests", id);
                         const qSnap = await transaction.get(qRef);
                         if (qSnap.data().scoreUpdated) return; 
-                        const pName = data.claimedBy.toLowerCase();
-                        const pRef = doc(db, "players", pName);
+                        const pRef = doc(db, "players", data.claimedBy.toLowerCase());
                         const pSnap = await transaction.get(pRef);
                         transaction.update(qRef, { scoreUpdated: true });
                         if (!pSnap.exists()) {
@@ -220,29 +239,17 @@
                 card.innerHTML = h + `<img src="${data.proofImage}" class="preview-img"><button class="small-del-btn" style="width:100%;margin-top:10px;" onclick="deleteQuestRecord('${id}')">DELETE</button>`;
                 cFeed.appendChild(card);
             } else {
-                if(data.status === "completed") { 
-                    h += `<img src="${data.proofImage}" class="preview-img"><button id="vbtn-${id}" onclick="vouch('${id}')" class="btn-vouch">VOUCH (${data.votes}/2)</button>`; 
-                }
-                else if(data.status === "claimed") { 
-                    h += `<p style="color:var(--accent)">IN PROGRESS...</p>
-                          <input type="file" onchange="uploadProof(this, '${id}')" accept="image/*">
-                          <button class="btn-cancel" onclick="forfeitQuest('${id}')">CANCEL MISSION</button>`; 
-                }
-                else { 
-                    h += `<div id="choice-${id}"><select id="sel-${id}">${playerDropdownHtml}</select><input type="text" id="new-${id}" placeholder="Or new hero..."><button onclick="acceptWithChoice('${id}')">ACCEPT</button></div>`; 
-                }
+                if(data.status === "completed") { h += `<img src="${data.proofImage}" class="preview-img"><button id="vbtn-${id}" onclick="vouch('${id}')" class="btn-vouch">VOUCH (${data.votes}/2)</button>`; }
+                else if(data.status === "claimed") { h += `<p style="color:var(--accent)">IN PROGRESS...</p><input type="file" onchange="uploadProof(this, '${id}')" accept="image/*"><button class="btn-cancel" onclick="forfeitQuest('${id}')">CANCEL MISSION</button>`; }
+                else { h += `<div id="choice-${id}"><select id="sel-${id}">${playerDropdownHtml}</select><input type="text" id="new-${id}" placeholder="Or new hero..."><button onclick="acceptWithChoice('${id}')">ACCEPT</button></div>`; }
                 card.innerHTML = h;
                 aFeed.appendChild(card);
             }
         });
     });
 
-    window.forfeitQuest = async (id) => {
-        if(confirm("Abandon mission? It will go back to the pool.")) {
-            await updateDoc(doc(db, "quests", id), { claimedBy: "", status: "open" });
-        }
-    };
-
+    // Helper functions
+    window.forfeitQuest = async (id) => { if(confirm("Abandon mission?")) await updateDoc(doc(db, "quests", id), { claimedBy: "", status: "open" }); };
     window.acceptWithChoice = async (id) => {
         const finalName = (document.getElementById(`new-${id}`).value.trim().toLowerCase() || document.getElementById(`sel-${id}`).value);
         if(!finalName) return;
@@ -250,44 +257,25 @@
         if(!(await getDoc(pRef)).exists()) await setDoc(pRef, { xp: 0, completedQuests: 0, allTimeXP: 0, allTimeQuests: 0, allTimeWins: 0 });
         await updateDoc(doc(db, "quests", id), { claimedBy: finalName, status: "claimed" });
     };
-
-    window.vouch = (id) => {
-        const btn = document.getElementById(`vbtn-${id}`);
-        if(btn) { btn.disabled = true; btn.innerText = "VOUCHING..."; }
-        updateDoc(doc(db, "quests", id), { votes: increment(1) });
-    };
-
+    window.vouch = (id) => { updateDoc(doc(db, "quests", id), { votes: increment(1) }); };
     window.deleteQuestRecord = (id) => deleteDoc(doc(db, "quests", id));
     window.deleteHero = (id) => deleteDoc(doc(db, "players", id));
     window.updateGoal = () => setDoc(doc(db, "metadata", "roundSettings"), { goal: parseInt(document.getElementById('newGoalInput').value) || 0 });
     
     window.resetRound = async () => {
-        if(!confirm("Terminate Round? Current leader will get a WIN and board will reset.")) return;
-        
+        if(!confirm("Crowning a Champion? Current leader gets a WIN and board resets.")) return;
+        document.getElementById('win-zone').classList.remove('active');
         const qSnap = await getDocs(questCol); 
         const pSnap = await getDocs(playerCol);
-        
-        let winnerId = null;
-        let maxXP = -1;
-        pSnap.forEach(d => {
-            if(d.data().xp > maxXP) {
-                maxXP = d.data().xp;
-                winnerId = d.id;
-            }
-        });
-
+        let winnerId = null; let maxXP = -1;
+        pSnap.forEach(d => { if(d.data().xp > maxXP) { maxXP = d.data().xp; winnerId = d.id; } });
         await runTransaction(db, async (transaction) => {
             qSnap.forEach(d => transaction.delete(d.ref));
             pSnap.forEach(d => {
                 const isWinner = (d.id === winnerId && maxXP > 0);
-                transaction.update(d.ref, { 
-                    xp: 0, 
-                    completedQuests: 0,
-                    allTimeWins: increment(isWinner ? 1 : 0)
-                });
+                transaction.update(d.ref, { xp: 0, completedQuests: 0, allTimeWins: increment(isWinner ? 1 : 0) });
             });
         });
-        alert(winnerId ? `THE CHAMPION IS ${winnerId.toUpperCase()}!` : "Round Reset.");
     };
 
     window.uploadProof = (el, id) => {
