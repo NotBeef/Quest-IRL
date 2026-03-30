@@ -1,258 +1,146 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Side Quest RPG</title>
-    
-    <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400..700&display=swap" rel="stylesheet">
-    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quest System & Leaderboard</title>
     <style>
-        :root { --primary: #bc13fe; --bg: #050505; --card: #121212; --text: #ffffff; --xp-color: #39ff14; --accent: #ffcc00; --danger: #ff4444; }
-        body { font-family: 'Pixelify Sans', sans-serif; background-color: var(--bg); color: var(--text); margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; overscroll-behavior-y: contain; }
-        .container { width: 100%; max-width: 500px; padding-bottom: env(safe-area-inset-bottom); margin-bottom: 60px; }
-        h1 { color: var(--primary); text-align: center; font-size: 3rem; text-shadow: 4px 4px 0px #5a008a; margin-bottom: 5px;}
-        .goal-banner { background: #1a1a1a; border: 2px dashed var(--accent); padding: 10px; text-align: center; margin-bottom: 20px; color: var(--accent); font-size: 1.2rem; }
+        body { font-family: sans-serif; background: #1a1a1a; color: #eee; padding: 20px; }
+        .container { display: flex; gap: 20px; }
+        .card { background: #2a2a2a; border-radius: 8px; padding: 20px; flex: 1; border: 1px solid #444; }
+        h2 { border-bottom: 2px solid #555; padding-bottom: 10px; }
         
-        .tabs { display: flex; gap: 5px; margin-bottom: 20px; position: sticky; top: 0; z-index: 100; background: var(--bg); padding: 10px 0; }
-        .tab-btn { background: #222; border: 2px solid #444; padding: 10px; flex: 1; color: #888; cursor: pointer; border-bottom: 4px solid #111; }
-        .tab-btn.active { background: var(--primary); color: white; border-color: var(--primary); border-bottom: 4px solid #5a008a; }
+        /* Leaderboard Styling */
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { text-align: left; padding: 8px; border-bottom: 1px solid #444; }
+        th { color: #ffd700; }
+
+        /* Quest Styling */
+        .quest-item { background: #333; margin: 10px 0; padding: 15px; border-radius: 4px; position: relative; }
+        .reward { color: #4caf50; font-weight: bold; }
+        .fine-print { font-size: 0.75rem; color: #888; margin-top: 10px; font-style: italic; border-top: 1px solid #444; pt: 5px; }
         
-        .quest-form { background: var(--card); padding: 20px; border: 3px solid var(--primary); margin-bottom: 30px; box-shadow: 6px 6px 0px #5a008a; }
-        input, select, button { font-family: 'Pixelify Sans', sans-serif; width: 100%; padding: 12px; margin: 10px 0; border: 2px solid #333; background: #1a1a1a; color: white; font-size: 16px !important; box-sizing: border-box; }
-        button { background: var(--primary); border: none; border-bottom: 4px solid #5a008a; color: white; text-transform: uppercase; cursor: pointer; }
-        
-        .quest-card { background: var(--card); padding: 20px; margin-bottom: 20px; border: 3px solid #333; position: relative; }
-        .xp-tag { color: var(--xp-color); font-size: 1.3rem; }
-        .creator-tag { font-size: 0.7rem; color: #777; margin-bottom: 5px; display: block; }
-        .player-tag { color: var(--accent); font-size: 1rem; margin-bottom: 10px; display: block; border-left: 3px solid var(--accent); padding-left: 8px; }
-        .preview-img { width: 100%; height: 250px; object-fit: cover; margin-top: 15px; border: 2px solid var(--primary); }
-        
-        .shame-text { color: var(--danger); font-weight: bold; }
-        .btn-penalty { background: #440000; color: white; border: 1px solid var(--danger); padding: 4px 8px; font-size: 0.7rem; width: auto; margin-left: 10px; }
-        
-        .admin-del-overlay { position: absolute; top: 5px; right: 5px; background: var(--danger); color: white; border: none; padding: 5px; font-size: 0.7rem; display: none; width: auto; }
-        .admin-active .admin-del-overlay, .admin-active .btn-penalty, .admin-active .admin-only { display: inline-block !important; }
-        .admin-only { display: none; border: 1px solid var(--danger); padding: 10px; margin-bottom: 20px; }
-        
-        table { width: 100%; border-collapse: collapse; background: var(--card); border: 2px solid var(--primary); }
-        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #333; }
-        .hidden { display: none; }
-        footer { margin-top: 40px; color: #333; font-size: 0.7rem; cursor: pointer; opacity: 0.5; padding-bottom: 20px;}
+        select, button { width: 100%; padding: 8px; margin-top: 10px; cursor: pointer; }
+        button:disabled { cursor: not-allowed; opacity: 0.5; }
+        .creator-badge { color: #ff4444; font-size: 0.8rem; font-weight: bold; }
     </style>
 </head>
-<body id="mainBody">
+<body>
+
+<h1>Adventure Dashboard</h1>
 
 <div class="container">
-    <h1>SIDE QUESTS</h1>
-    <div class="goal-banner" id="goal-display">GOAL: 5000 XP</div>
-
-    <div class="tabs">
-        <button id="btn-active" class="tab-btn active" onclick="switchTab('active')">QUESTS</button>
-        <button id="btn-completed" class="tab-btn" onclick="switchTab('completed')">HALL</button>
-        <button id="btn-scores" class="tab-btn" onclick="switchTab('scores')">RANK</button>
+    <div class="card">
+        <h2>Available Quests</h2>
+        <div id="quest-list">
+            </div>
     </div>
 
-    <div id="active-section">
-        <div class="quest-form">
-            <h3 style="margin:0; color:var(--xp-color)">[ NEW QUEST ]</h3>
-            <input type="text" id="creatorName" placeholder="Your Hero Name (The Creator)">
-            <input type="text" id="questTitle" placeholder="Quest Title">
-            <input type="text" id="questDesc" placeholder="Objective...">
-            <select id="riskLevel">
-                <option value="1">Level 1 (Sweaty)</option>
-                <option value="2">Level 2 (Risky)</option>
-                <option value="3">Level 3 (High Life)</option>
-                <option value="4">Level 4 (Restricted)</option>
-                <option value="5">Level 5 (Insane)</option>
-            </select>
-            <button id="submitQuest">Deploy</button>
-        </div>
-        <div id="activeFeed"></div>
+    <div class="card">
+        <h2>Global Leaderboard</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Hero Name</th>
+                    <th>XP</th>
+                </tr>
+            </thead>
+            <tbody id="leaderboard-body">
+                </tbody>
+        </table>
     </div>
-
-    <div id="completed-section" class="hidden"><div id="completedFeed"></div></div>
-
-    <div id="scores-section" class="hidden">
-        <div class="admin-only">
-            <input type="number" id="newGoalInput" placeholder="Set XP Goal">
-            <button onclick="updateGoal()">Set Goal</button>
-            <button style="background:var(--danger)" onclick="resetRound()">RESET MATCH</button>
-        </div>
-        <table><thead><tr><th>HERO</th><th>XP</th><th>ACTION</th></tr></thead><tbody id="score-body"></tbody></table>
-        <h2 style="text-align:center;color:var(--accent); margin-top:30px;">ALL-TIME LEGENDS</h2>
-        <table><thead><tr><th>HERO</th><th>XP</th><th class="shame-text">SHAMES</th></tr></thead><tbody id="all-time-body"></tbody></table>
-    </div>
-    <footer onclick="adminLogin()">Admin Access</footer>
 </div>
 
-<script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-    import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, deleteDoc, doc, updateDoc, increment, setDoc, getDoc, runTransaction, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+<script>
+    // 1. DATA INITIALIZATION
+    // Simulated "Logged In" Player
+    const currentPlayer = { id: "user_01", name: "Alice" };
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyDw9qBL6_OxdYBhs9zghFjgueMkuLMvhiM",
-      authDomain: "side-quests-9466b.firebaseapp.com",
-      projectId: "side-quests-9466b",
-      storageBucket: "side-quests-9466b.firebasestorage.app",
-      messagingSenderId: "516078043611",
-      appId: "1:516078043611:web:eb566c5cb127b56a8f67fe"
-    };
+    // Heroes are linked to the Leaderboard via their ID and Name
+    let heroes = [
+        { id: "h1", ownerId: "user_01", name: "Sir Lancelot", xp: 1200 },
+        { id: "h2", ownerId: "user_01", name: "Alice Mage", xp: 850 },
+        { id: "h3", ownerId: "user_02", name: "Shadow Blade", xp: 2100 } // Not owned by Alice
+    ];
 
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-    const questCol = collection(db, "quests");
-    const playerCol = collection(db, "players");
+    const quests = [
+        { id: "q1", title: "Slay the Forest Troll", reward: 200, creatorId: "user_02" },
+        { id: "q2", title: "My Custom Hard Quest", reward: 500, creatorId: "user_01" } // Created by Alice
+    ];
 
-    let isAdmin = false;
-    let playerDropdownHtml = '<option value="">-- Choose Hero --</option>';
+    // 2. LOGIC: RENDER QUESTS
+    function renderQuests() {
+        const questList = document.getElementById('quest-list');
+        questList.innerHTML = '';
 
-    window.adminLogin = () => { if(prompt("Code:") === "3250") { isAdmin = true; document.getElementById('mainBody').classList.add('admin-active'); } };
-    
-    window.switchTab = (type) => {
-        ['active', 'completed', 'scores'].forEach(t => {
-            document.getElementById(t + '-section').classList.add('hidden');
-            document.getElementById('btn-' + t).classList.remove('active');
-        });
-        document.getElementById(type + '-section').classList.remove('hidden');
-        document.getElementById('btn-' + type).classList.add('active');
-    };
-
-    onSnapshot(doc(db, "metadata", "roundSettings"), (d) => {
-        if(d.exists()) document.getElementById('goal-display').innerText = `GOAL: ${d.data().goal} XP`;
-    });
-
-    onSnapshot(playerCol, (snapshot) => {
-        const scoreBody = document.getElementById('score-body');
-        const allTimeBody = document.getElementById('all-time-body');
-        scoreBody.innerHTML = ""; allTimeBody.innerHTML = "";
-        playerDropdownHtml = '<option value="">-- Choose Hero --</option>';
-        let playersArr = [];
-        snapshot.forEach(pDoc => {
-            playersArr.push({ id: pDoc.id, ...pDoc.data() });
-            playerDropdownHtml += `<option value="${pDoc.id}">${pDoc.id.toUpperCase()}</option>`;
-        });
-        
-        playersArr.sort((a,b) => (b.xp || 0) - (a.xp || 0)).forEach(p => {
-            scoreBody.innerHTML += `<tr><td>${p.id.toUpperCase()}</td><td style="color:var(--xp-color)">${p.xp || 0}</td>
-            <td><button class="btn-penalty" onclick="applyPenalty('${p.id}')">PENALIZE</button></td></tr>`;
-        });
-        playersArr.sort((a,b) => (b.allTimeXP || 0) - (a.allTimeXP || 0)).forEach(p => {
-            allTimeBody.innerHTML += `<tr><td>${p.id.toUpperCase()}</td><td>${p.allTimeXP || 0}</td><td class="shame-text">${p.shames || 0}</td></tr>`;
-        });
-    });
-
-    onSnapshot(query(questCol, orderBy("createdAt", "desc")), (snapshot) => {
-        const aFeed = document.getElementById('activeFeed');
-        const cFeed = document.getElementById('completedFeed');
-        aFeed.innerHTML = ""; cFeed.innerHTML = "";
-
-        snapshot.forEach(async (qDoc) => {
-            const data = qDoc.data();
-            const id = qDoc.id;
-            const isVerified = (data.votes >= 2);
-
-            if (isVerified && !data.scoreUpdated && data.claimedBy) {
-                await runTransaction(db, async (t) => {
-                    const qRef = doc(db, "quests", id);
-                    const qSnap = await t.get(qRef);
-                    if (qSnap.data().scoreUpdated) return;
-                    const pRef = doc(db, "players", data.claimedBy.toLowerCase());
-                    const pSnap = await t.get(pRef);
-                    t.update(qRef, { scoreUpdated: true });
-                    if (!pSnap.exists()) t.set(pRef, { xp: data.xp, completedQuests: 1, allTimeXP: data.xp, allTimeQuests: 1, shames: 0 });
-                    else t.update(pRef, { xp: increment(data.xp), completedQuests: increment(1), allTimeXP: increment(data.xp), allTimeQuests: increment(1) });
-                });
-            }
-
-            const card = document.createElement('div');
-            card.className = `quest-card`;
-            let h = `<button class="admin-del-overlay" onclick="deleteQuestRecord('${id}')">DEL</button>
-                    <span class="creator-tag">Created by: ${data.creator?.toUpperCase() || 'UNKNOWN'}</span>
-                    <div style="display:flex; justify-content:space-between">
-                        <span style="color:var(--primary); font-size:1.2rem;">${data.title}</span>
-                        <span class="xp-tag">+${data.xp}</span>
-                    </div>
-                    <p style="font-size:0.9rem; color:#ccc; margin:5px 0;">${data.desc}</p>`;
+        quests.forEach(quest => {
+            const isCreator = quest.creatorId === currentPlayer.id;
             
-            if(data.claimedBy) h += `<span class="player-tag">${data.claimedBy.toUpperCase()}</span>`;
+            // Filter: Get only heroes owned by player for the dropdown
+            const myHeroes = heroes.filter(h => h.ownerId === currentPlayer.id);
 
-            if(isVerified) {
-                card.innerHTML = h + `<img src="${data.proofImage}" class="preview-img">`;
-                cFeed.appendChild(card);
-            } else {
-                if(data.status === "completed") { 
-                    h += `<img src="${data.proofImage}" class="preview-img">
-                          <button id="vbtn-${id}" onclick="vouch('${id}')">VOUCH (${data.votes}/2)</button>`; 
-                } else if(data.status === "claimed") { 
-                    h += `<input type="file" onchange="uploadProof(this, '${id}')" accept="image/*"><button onclick="forfeitQuest('${id}')">CANCEL</button>`; 
-                } else { 
-                    h += `<select id="sel-${id}">${playerDropdownHtml}</select><input type="text" id="new-${id}" placeholder="New Hero Name..."><button onclick="acceptWithChoice('${id}')">ACCEPT</button>`; 
-                }
-                card.innerHTML = h;
-                aFeed.appendChild(card);
-            }
+            const questHtml = `
+                <div class="quest-item">
+                    <strong>${quest.title}</strong><br>
+                    <span class="reward">+${quest.reward} XP</span>
+                    
+                    ${isCreator ? 
+                        `<p class="creator-badge">You created this quest</p>` : 
+                        `<select id="select-${quest.id}">
+                            <option value="">-- Select Existing Hero --</option>
+                            ${myHeroes.map(h => `<option value="${h.id}">${h.name}</option>`).join('')}
+                        </select>
+                        <button onclick="completeQuest('${quest.id}')">Complete Quest</button>`
+                    }
+
+                    <div class="fine-print">
+                        Hero names are linked to the Global Leaderboard. <br>
+                        <strong>Creator cannot complete.</strong>
+                    </div>
+                </div>
+            `;
+            questList.insertAdjacentHTML('beforeend', questHtml);
         });
-    });
+    }
 
-    window.applyPenalty = async (pId) => {
-        if(!confirm(`Apply -100 XP Penalty and +1 SHAME to ${pId}?`)) return;
-        const pRef = doc(db, "players", pId);
-        await updateDoc(pRef, { xp: increment(-100), allTimeXP: increment(-100), shames: increment(1) });
-    };
+    // 3. LOGIC: COMPLETE QUEST & UPDATE LEADERBOARD
+    function completeQuest(questId) {
+        const quest = quests.find(q => q.id === questId);
+        const heroId = document.getElementById(`select-${questId}`).value;
 
-    window.forfeitQuest = (id) => updateDoc(doc(db, "quests", id), { claimedBy: "", status: "open" });
-    window.acceptWithChoice = async (id) => {
-        const finalName = (document.getElementById(`new-${id}`).value.trim().toLowerCase() || document.getElementById(`sel-${id}`).value);
-        if(!finalName) return;
-        const pRef = doc(db, "players", finalName);
-        if(!(await getDoc(pRef)).exists()) await setDoc(pRef, { xp: 0, completedQuests: 0, allTimeXP: 0, allTimeQuests: 0, shames: 0 });
-        await updateDoc(doc(db, "quests", id), { claimedBy: finalName, status: "claimed" });
-    };
+        if (!heroId) {
+            alert("Please select a hero first!");
+            return;
+        }
 
-    window.vouch = (id) => {
-        const btn = document.getElementById(`vbtn-${id}`);
-        if(btn) { btn.disabled = true; btn.innerText = "VOUCHED"; }
-        updateDoc(doc(db, "quests", id), { votes: increment(1) });
-    };
+        // Logic check: Link Quest reward to the selected Hero
+        const hero = heroes.find(h => h.id === heroId);
+        hero.xp += quest.reward;
 
-    window.deleteQuestRecord = (id) => deleteDoc(doc(db, "quests", id));
-    window.updateGoal = () => setDoc(doc(db, "metadata", "roundSettings"), { goal: parseInt(document.getElementById('newGoalInput').value) || 0 });
-    
-    window.resetRound = async () => {
-        if(!confirm("Reset match XP?")) return;
-        const qSnap = await getDocs(questCol); const pSnap = await getDocs(playerCol);
-        await runTransaction(db, async (t) => {
-            qSnap.forEach(d => t.delete(d.ref));
-            pSnap.forEach(d => t.update(d.ref, { xp: 0, completedQuests: 0 }));
-        });
-    };
+        alert(`${hero.name} completed the quest! XP added to Leaderboard.`);
+        updateLeaderboard();
+        renderQuests();
+    }
 
-    window.uploadProof = (el, id) => {
-        const reader = new FileReader(); reader.readAsDataURL(el.files[0]);
-        reader.onload = (e) => {
-            const img = new Image(); img.src = e.target.result;
-            img.onload = () => {
-                const canvas = document.createElement('canvas'); const scale = 600 / img.width;
-                canvas.width = 600; canvas.height = img.height * scale;
-                canvas.getContext('2d').drawImage(img, 0, 0, 600, canvas.height);
-                updateDoc(doc(db, "quests", id), { proofImage: canvas.toDataURL('image/jpeg', 0.6), status: "completed" });
-            };
-        };
-    };
+    // 4. LOGIC: UPDATE LEADERBOARD (Sorted by XP)
+    function updateLeaderboard() {
+        const tbody = document.getElementById('leaderboard-body');
+        
+        // Sort heroes by XP descending
+        const sortedHeroes = [...heroes].sort((a, b) => b.xp - a.xp);
 
-    document.getElementById('submitQuest').onclick = () => {
-        const creator = document.getElementById('creatorName').value.trim().toLowerCase();
-        const title = document.getElementById('questTitle').value;
-        const desc = document.getElementById('questDesc').value;
-        const risk = parseInt(document.getElementById('riskLevel').value);
-        if(creator && desc) {
-            addDoc(questCol, { creator, title, desc, risk, xp: 50 + (risk * 75), createdAt: Date.now(), status: "open", votes: 0, claimedBy: "", scoreUpdated: false });
-            document.getElementById('questTitle').value = ""; document.getElementById('questDesc').value = "";
-        } else { alert("Enter your name and a description!"); }
-    };
+        tbody.innerHTML = sortedHeroes.map(h => `
+            <tr>
+                <td>${h.name}</td>
+                <td>${h.xp}</td>
+            </tr>
+        `).join('');
+    }
+
+    // Initial Run
+    renderQuests();
+    updateLeaderboard();
 </script>
+
 </body>
 </html>
-
