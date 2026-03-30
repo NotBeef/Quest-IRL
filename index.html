@@ -24,6 +24,7 @@
         input, select, button { font-family: 'Pixelify Sans', sans-serif; width: 100%; padding: 12px; margin: 10px 0; border: 2px solid #333; background: #1a1a1a; color: white; font-size: 16px !important; box-sizing: border-box; }
         button { background: var(--primary); border: none; border-bottom: 4px solid #5a008a; color: white; text-transform: uppercase; cursor: pointer; }
         button:disabled { opacity: 0.5 !important; filter: grayscale(1); }
+        .btn-cancel { background: #444; border-bottom: 4px solid #222; margin-top: 5px; font-size: 0.8rem; }
         .quest-card { background: var(--card); padding: 20px; margin-bottom: 20px; border: 3px solid #333; overflow: hidden; }
         .verified-border { border-color: var(--xp-color) !important; box-shadow: 0 0 10px var(--xp-color); }
         .xp-tag { color: var(--xp-color); font-size: 1.3rem; }
@@ -169,34 +170,23 @@
 
             const isVerified = (data.votes >= 2);
 
-            // ATOMIC TRANSACTION FOR PAYOUT
             if (isVerified && !data.scoreUpdated && data.claimedBy) {
                 try {
                     await runTransaction(db, async (transaction) => {
                         const qRef = doc(db, "quests", id);
                         const qSnap = await transaction.get(qRef);
-                        
-                        // Check if someone else already finished it while we were thinking
                         if (qSnap.data().scoreUpdated) return; 
-
                         const pName = data.claimedBy.toLowerCase();
                         const pRef = doc(db, "players", pName);
                         const pSnap = await transaction.get(pRef);
-
                         transaction.update(qRef, { scoreUpdated: true });
-
                         if (!pSnap.exists()) {
                             transaction.set(pRef, { xp: data.xp, completedQuests: 1, allTimeXP: data.xp, allTimeQuests: 1 });
                         } else {
-                            transaction.update(pRef, {
-                                xp: increment(data.xp),
-                                completedQuests: increment(1),
-                                allTimeXP: increment(data.xp),
-                                allTimeQuests: increment(1)
-                            });
+                            transaction.update(pRef, { xp: increment(data.xp), completedQuests: increment(1), allTimeXP: increment(data.xp), allTimeQuests: increment(1) });
                         }
                     });
-                } catch (e) { console.error("Transaction failed: ", e); }
+                } catch (e) { console.error(e); }
             }
 
             const card = document.createElement('div');
@@ -212,7 +202,9 @@
                     h += `<img src="${data.proofImage}" class="preview-img"><button id="vbtn-${id}" onclick="vouch('${id}')" class="btn-vouch">VOUCH (${data.votes}/2)</button>`; 
                 }
                 else if(data.status === "claimed") { 
-                    h += `<p style="color:var(--accent)">IN PROGRESS...</p><input type="file" onchange="uploadProof(this, '${id}')" accept="image/*">`; 
+                    h += `<p style="color:var(--accent)">IN PROGRESS...</p>
+                          <input type="file" onchange="uploadProof(this, '${id}')" accept="image/*">
+                          <button class="btn-cancel" onclick="forfeitQuest('${id}')">CANCEL MISSION</button>`; 
                 }
                 else { 
                     h += `<div id="choice-${id}"><select id="sel-${id}">${playerDropdownHtml}</select><input type="text" id="new-${id}" placeholder="Or new hero..."><button onclick="acceptWithChoice('${id}')">ACCEPT</button></div>`; 
@@ -222,6 +214,12 @@
             }
         });
     });
+
+    window.forfeitQuest = async (id) => {
+        if(confirm("Abandon mission? It will go back to the pool.")) {
+            await updateDoc(doc(db, "quests", id), { claimedBy: "", status: "open" });
+        }
+    };
 
     window.acceptWithChoice = async (id) => {
         const finalName = (document.getElementById(`new-${id}`).value.trim().toLowerCase() || document.getElementById(`sel-${id}`).value);
@@ -245,7 +243,7 @@
         if(!confirm("Reset match?")) return;
         const qSnap = await getDocs(questCol); 
         const pSnap = await getDocs(playerCol);
-        const batch = runTransaction(db, async (transaction) => {
+        await runTransaction(db, async (transaction) => {
             qSnap.forEach(d => transaction.delete(d.ref));
             pSnap.forEach(d => transaction.update(d.ref, { xp: 0, completedQuests: 0 }));
         });
